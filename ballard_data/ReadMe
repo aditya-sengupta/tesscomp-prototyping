@@ -1,0 +1,40 @@
+================================================================================
+Title: Predicted Number, Multiplicity, and Orbital Dynamics of TESS M Dwarf 
+    Exoplanets 
+Authors: Ballard S.
+================================================================================
+Description of contents: Set of 2D TESS mission completeness functions
+
+    Completeness_0.3Msun.fits
+    Completeness_0.3Msun.npy
+    Completeness_0.4Msun.fits
+    Completeness_0.4Msun.npy
+    Completeness_0.5Msun.fits
+    Completeness_0.5Msun.npy
+
+    Completeness file(s) corresponding to 0.3M_sun contains 17 columns, 13 rows, and each cell is a 353 element array.
+    Completeness file(s) corresponding to 0.4M_sun contains 17 columns, 13 rows, and each cell is a 317 element array.
+    Completeness file(s) corresponding to 0.5M_sun contains 17 columns, 13 rows, and each cell is a 333 element array. 
+
+    In addition there are two FITS image arrays describing the columns
+        (radius) and rows (period) of these arrays. More information on 
+        these values is given in the additional comments.
+    
+        period_array.fits
+        radius_array.fits
+
+System requirements: The FITS versions of the completeness functions are
+    standard FITS binary tables (data in HDU=1). The XY arrays for radius
+    and period are standard FITS image arrays.
+
+Additional comments: Each 17x13 array is a completeness function, giving the
+    detection probability as a function of planetary radius (17 values in
+    equal log spacing from -1.22 to 1.33, corresponding to radii from
+    0.8--3.8 R_Earth) and orbital period (13 values in equal log spacing
+    from -0.22 to 5.77, corresponding to orbital periods from 0.8 to 322.8
+    days). For each of the three stellar masses, each 17x13 array is drawn
+    from the completeness posterior distribution. The range in the
+    completeness value in each cell reflects the uncertainty in the
+    detection completeness at that radius and orbital period.  
+
+================================================================================
