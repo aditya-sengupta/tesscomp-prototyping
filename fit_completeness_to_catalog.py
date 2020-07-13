@@ -6,8 +6,6 @@ from tqdm.notebook import tqdm
 import emcee
 import corner
 
-cut_to_Ms = True
-
 # constants and frozen parameters, like the bins
 
 Go4pi = 2945.4625385377644/(4 * np.pi * np.pi)
@@ -78,7 +76,7 @@ def make_synth_solar_systems(mixture_params=mixture_params, num_stars=10000, mst
                          "ttv" : ttv, 
                         })
 
-def get_catalog_and_numstars(name):
+def get_catalog_and_numstars(name, cut_to_Ms=True):
     if name == "sullivan":
         catalog = np.loadtxt('sullivan_catalog.dat')
         cols = ["alpha", "delta", "prads", "periods", "SoSsun", "K", "rs", "teff", "V", "Ic", "J", "Ks", "DM", "Dil.", "log10_sigmav", "SNR", "mult"]
@@ -165,7 +163,7 @@ def plot_marginalized_comps(params):
     ax2.set_ylabel("Completeness fraction")
     plt.show()
 
-def plot_overall_comps(params, name):
+def plot_overall_comps(repcomp, name):
     comp04m = np.load('ballard_data/Completeness_0.4Msun.npy')
     fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(15,12))
     ballard_comp = ax1.imshow(comp04m[-1], origin='lower')
@@ -177,7 +175,7 @@ def plot_overall_comps(params, name):
     ax1.set_yticklabels(np.round(bins_r[::2], 2))
     ax1.set_ylabel(r"Radius ($R_E$)")
     ax1.set_title("Ballard (2018) completeness")
-    self_comp = ax2.imshow(np.outer(comp_poly(bins_p, *params[:4]), comp_poly(bins_r, *params[4:])).T, origin='lower')
+    self_comp = ax2.imshow(repcomp, origin='lower')
     fig.colorbar(self_comp, ax=ax2, fraction=0.058)
     ax2.set_xticks(np.arange(13)[::2])
     ax2.set_xticklabels(np.round(bins_p[::2], 2))
