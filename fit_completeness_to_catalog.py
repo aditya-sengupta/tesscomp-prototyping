@@ -22,6 +22,7 @@ fs = 0.55
 mixture_params = {"N1": N1, "sigma1": sigma1, "N2": N2, "sigma2": sigma2, "fs": fs}
 bins_p = np.exp(np.linspace(*np.log(rng_p), num_bins_p))
 bins_r = np.exp(np.linspace(*np.log(rng_r), num_bins_r))
+eps = 1e-3
 
 def make_synth_solar_systems(mixture_params=mixture_params, num_stars=10000, mstar=0.4):
     '''
@@ -120,8 +121,9 @@ def make_mcmc_setup(N, D, nwalkers=24):
         if np.any(comp < 0):
             return -np.inf
         mu = N * comp
-        if np.any(mu <= 0):
+        if np.any(mu < 0):
             return -np.inf
+        mu += eps
         # likelihood_mat = mu ** D * np.exp(-mu) / fact_D
         # return np.nansum(np.log(likelihood_mat))
         ll_mat = D * np.log(mu) - mu - log_fact_D
