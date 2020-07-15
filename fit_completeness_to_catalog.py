@@ -10,7 +10,7 @@ import corner
 
 Go4pi = 2945.4625385377644/(4 * np.pi * np.pi)
 MsoMe_cbrt = 69.31
-rng_p = np.array([0.5, 200])
+rng_p = np.array([0.5, 27])
 rng_r = np.array([0.5, 4])
 num_bins_p = 13
 num_bins_r = 17
@@ -90,7 +90,7 @@ def get_catalog_and_numstars(name, cut_to_Ms=True):
         catalog = catalog.rename(columns={"Planet-period" : "periods", "Planet-radius": "prads"})
         if cut_to_Ms:
             catalog = catalog[catalog["Star-teff"] <= 3700]
-        num_stars = len(catalog)
+        num_stars = len(set(catalog["TICID"]))
     print("Selected {} stars".format(num_stars))
     return catalog, num_stars
 
@@ -117,6 +117,9 @@ def make_mcmc_setup(N, D, nwalkers=24):
         has_negative = np.any(comp_p < 0) or np.any(comp_r < 0)
         if has_negative:
             return -np.inf
+        if False:
+            if np.any(comp_p > 1) or np.any(comp_r > 1):
+                return -np.inf
         comp = np.outer(comp_p, comp_r)
         if np.any(comp < 0):
             return -np.inf
@@ -130,12 +133,12 @@ def make_mcmc_setup(N, D, nwalkers=24):
         return np.sum(ll_mat)
 
     ndim = 8
-    optimize_result = optimize.minimize(lambda x: -ll(x), [1, 0, 0, 0, 1, 0, 0, 0], method='Nelder-Mead', options={"maxiter" :10000})
+    optimize_result = optimize.minimize(lambda x: -ll(x), [1.1, -0.55, 0.11, -0.01, 0.14, 0.45, 0.4, 0.2], method='Nelder-Mead', options={"maxiter" :10000})
     leastsq_sol = optimize_result.x
     print("Found least-squares solution: {}".format(leastsq_sol))
 
     def prior(a):
-        return np.all(np.isfinite(a)) and np.all(np.abs(leastsq_sol - a) < 100)
+        return np.all(np.isfinite(a)) and np.all(np.abs(leastsq_sol - a) < np.abs(2 * leastsq_sol))
 
     def ll_with_prior(a):
         if not prior(a):
