@@ -10,7 +10,7 @@ import corner
 
 Go4pi = 2945.4625385377644/(4 * np.pi * np.pi)
 MsoMe_cbrt = 69.31
-rng_p = np.array([0.5, 27])
+rng_p = np.array([0.5, 200])
 rng_r = np.array([0.5, 4])
 num_bins_p = 13
 num_bins_r = 17
@@ -138,7 +138,7 @@ def make_mcmc_setup(N, D, nwalkers=24):
     print("Found least-squares solution: {}".format(leastsq_sol))
 
     def prior(a):
-        return np.all(np.isfinite(a)) and np.all(np.abs(leastsq_sol - a) < np.abs(2 * leastsq_sol))
+        return np.all(np.isfinite(a)) and np.all(np.abs(leastsq_sol - a) < np.maximum(0.01, np.abs(4 * leastsq_sol)))
 
     def ll_with_prior(a):
         if not prior(a):
@@ -160,11 +160,11 @@ def make_mcmc_setup(N, D, nwalkers=24):
 
 def plot_marginalized_comps(params):
     fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(10, 4))
-    ax1.plot(bins_p, comp_poly(bins_p, *params[:4]))
-    ax1.set_xlabel("Period (days)")
+    ax1.plot(comp_poly(bins_p, *params[:4]))
+    ax1.set_xlabel("Period bucket")
     ax1.set_ylabel("Completeness fraction")
-    ax2.plot(bins_r, comp_poly(bins_r, *params[4:]))
-    ax2.set_xlabel(r"Radius ($R_E$)")
+    ax2.plot(comp_poly(bins_r, *params[4:]))
+    ax2.set_xlabel("Radius bucket")
     ax2.set_ylabel("Completeness fraction")
     plt.show()
 
