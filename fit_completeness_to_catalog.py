@@ -22,7 +22,7 @@ fs = 0.55
 mixture_params = {"N1": N1, "sigma1": sigma1, "N2": N2, "sigma2": sigma2, "fs": fs}
 bins_p = np.exp(np.linspace(*np.log(rng_p), num_bins_p))
 bins_r = np.exp(np.linspace(*np.log(rng_r), num_bins_r))
-eps = 1e-3
+eps = 1e-6
 
 def make_synth_solar_systems(mixture_params=mixture_params, num_stars=10000, mstar=0.4):
     '''
@@ -114,23 +114,12 @@ def make_mcmc_setup(N, D, nwalkers=24):
     def ll(a):
         a_period, a_radius = a[:4], a[4:]
         comp_p, comp_r = comp_poly(bins_p[:-1], *a_period), comp_poly(bins_r[:-1], *a_radius)
-        has_negative = np.any(comp_p < 0) or np.any(comp_r < 0)
-        if has_negative:
-            return -np.inf
-        if False:
-            if np.any(comp_p > 1) or np.any(comp_r > 1):
-                return -np.inf
         comp = np.outer(comp_p, comp_r)
-        if np.any(comp < 0):
-            return -np.inf
         mu = N * comp
-        if np.any(mu < 0):
-            return -np.inf
-        mu += eps
-        # likelihood_mat = mu ** D * np.exp(-mu) / fact_D
-        # return np.nansum(np.log(likelihood_mat))
+        if np.any(mu <= 0):
+            mu += np.min(mu) + eps
         ll_mat = D * np.log(mu) - mu - log_fact_D
-        return np.sum(ll_mat)
+        return np.nansum(ll_mat)
 
     ndim = 8
     optimize_result = optimize.minimize(lambda x: -ll(x), [1.1, -0.55, 0.11, -0.01, 0.14, 0.45, 0.4, 0.2], method='Nelder-Mead', options={"maxiter" :10000})
@@ -138,7 +127,7 @@ def make_mcmc_setup(N, D, nwalkers=24):
     print("Found least-squares solution: {}".format(leastsq_sol))
 
     def prior(a):
-        return np.all(np.isfinite(a)) and np.all(np.abs(leastsq_sol - a) < np.maximum(0.01, np.abs(4 * leastsq_sol)))
+        return np.all(np.isfinite(a)) and np.all(np.abs(leastsq_sol - a) < np.maximum(10, np.abs(8 * leastsq_sol)))
 
     def ll_with_prior(a):
         if not prior(a):
@@ -158,12 +147,12 @@ def make_mcmc_setup(N, D, nwalkers=24):
     print("Set initial condition")
     return ll_with_prior, p0
 
-def plot_marginalized_comps(params):
+def plot_marginalized_comps(comp_p, comp_r):
     fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(10, 4))
-    ax1.plot(comp_poly(bins_p, *params[:4]))
+    ax1.plot(comp_p)
     ax1.set_xlabel("Period bucket")
     ax1.set_ylabel("Completeness fraction")
-    ax2.plot(comp_poly(bins_r, *params[4:]))
+    ax2.plot(comp_r)
     ax2.set_xlabel("Radius bucket")
     ax2.set_ylabel("Completeness fraction")
     plt.show()
