@@ -20,9 +20,9 @@ N2 = 6.1
 sigma2 = 2
 fs = 0.55
 mixture_params = {"N1": N1, "sigma1": sigma1, "N2": N2, "sigma2": sigma2, "fs": fs}
-bins_p = np.exp(np.linspace(*np.log(rng_p), num_bins_p))
-bins_r = np.exp(np.linspace(*np.log(rng_r), num_bins_r))
-eps = 1e-6
+bins_p = 10 ** (np.linspace(*np.log10(rng_p), num_bins_p))
+bins_r = 10 ** (np.linspace(*np.log10(rng_r), num_bins_r))
+eps = 1e-3
 
 def make_synth_solar_systems(mixture_params=mixture_params, num_stars=10000, mstar=0.4):
     '''
@@ -43,8 +43,8 @@ def make_synth_solar_systems(mixture_params=mixture_params, num_stars=10000, mst
     ecc_means = 0.584 * np.repeat(nums_planets, nums_planets) ** (-1.2) # Limbach and Turner
     eccs = np.random.rayleigh(np.sqrt(2 / np.pi) * ecc_means)
     num_planets = sum(nums_planets)
-    periods = np.exp(np.random.uniform(*np.log(rng_p), size=(num_planets,))) # in days
-    prads = np.exp(np.random.uniform(*np.log(rng_r), size=(num_planets,))) # in R_Earths
+    periods = 10 ** (np.random.uniform(*np.log10(rng_p), size=(num_planets,))) # in days
+    prads = 10 ** (np.random.uniform(*np.log10(rng_r), size=(num_planets,))) # in R_Earths
     pmass = np.maximum(0.8, 2.7 * prads ** 1.3 + np.random.normal(0, 1.9, size=(num_planets,))) # ignoring Zeng/Jacobsen
     system_inds = np.cumsum(nums_planets)
     solar_sys_ids = []
@@ -54,8 +54,8 @@ def make_synth_solar_systems(mixture_params=mixture_params, num_stars=10000, mst
     unstable_inds = np.where(np.logical_and((np.abs(stabilities) <= 2 * np.sqrt(3)), ([x in system_inds for x in range(len(stabilities))])))[0]
     # may need to sort in period order?
     while len(unstable_inds) > 0:
-        replace_periods = np.exp(np.random.uniform(*np.log(rng_p), size=(len(unstable_inds),)))
-        replace_prads = np.exp(np.random.uniform(*np.log(rng_r), size=(len(unstable_inds),)))
+        replace_periods = 10 ** (np.random.uniform(*np.log10(rng_p), size=(len(unstable_inds),)))
+        replace_prads = 10 ** (np.random.uniform(*np.log10(rng_r), size=(len(unstable_inds),)))
         replace_pmass = 2.7 * replace_prads ** 1.3 + np.random.normal(0, 1.9, size=(len(unstable_inds),)) # ignoring Zeng/Jacobsen
         periods[unstable_inds] = replace_periods
         prads[unstable_inds] = replace_prads
@@ -84,7 +84,7 @@ def get_catalog_and_numstars(name, cut_to_Ms=True):
         catalog = pd.DataFrame({x: catalog[:,i] for i, x in enumerate(cols)})
         if cut_to_Ms:
             catalog = catalog[catalog.teff <= 3700]
-        num_stars = len(catalog)
+        num_stars = 20000 or len(catalog)
     elif name == "barclay":
         catalog = pd.read_csv('barclay_data/detected_planets.csv', skiprows=42)
         catalog = catalog.rename(columns={"Planet-period" : "periods", "Planet-radius": "prads"})
@@ -109,7 +109,7 @@ def make_hists(synth, catalog, plot=True):
 comp_poly = lambda x, a1, a2, a3, a4: a4 + a1 * x + (a1 * a2) * x ** 2 + (a1/3) * (a2**2 + a3**2) * x ** 3
 
 def make_mcmc_setup(N, D, nwalkers=24):
-    log_fact_D = special.gammaln(D + 1)
+    log_fact_D = special.gammaln(D + 1) * np.log10(np.e)
 
     def ll(a):
         a_period, a_radius = a[:4], a[4:]
@@ -117,7 +117,8 @@ def make_mcmc_setup(N, D, nwalkers=24):
         comp = np.outer(comp_p, comp_r)
         mu = N * comp
         if np.any(mu <= 0):
-            mu += np.min(mu) + eps
+            mu -= np.min(mu)
+            mu += eps
         ll_mat = D * np.log(mu) - mu - log_fact_D
         return np.nansum(ll_mat)
 
@@ -127,12 +128,13 @@ def make_mcmc_setup(N, D, nwalkers=24):
     print("Found least-squares solution: {}".format(leastsq_sol))
 
     def prior(a):
-        return np.all(np.isfinite(a)) and np.all(np.abs(leastsq_sol - a) < np.maximum(10, np.abs(8 * leastsq_sol)))
+        if not np.all(np.isfinite(a)):
+            return -np.inf
+        return stats.multivariate_normal.logpdf(a, mean=leastsq_sol, cov=np.diag(np.ones((8,))))
+            # and np.all(np.abs(leastsq_sol - a) < np.maximum(10, np.abs(8 * leastsq_sol)))
 
     def ll_with_prior(a):
-        if not prior(a):
-            return -np.inf
-        return ll(a)
+        return ll(a) + prior(a)
     
     flag = False
     p0 = leastsq_sol + np.random.normal(0, 1e-3, size=(nwalkers, ndim))
