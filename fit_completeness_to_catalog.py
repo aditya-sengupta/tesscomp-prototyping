@@ -84,7 +84,7 @@ def get_catalog_and_numstars(name, cut_to_Ms=True):
         catalog = pd.DataFrame({x: catalog[:,i] for i, x in enumerate(cols)})
         if cut_to_Ms:
             catalog = catalog[catalog.teff <= 3700]
-        num_stars = 20000 or len(catalog)
+        num_stars = 200000 or len(catalog)
     elif name == "barclay":
         catalog = pd.read_csv('barclay_data/detected_planets.csv', skiprows=42)
         catalog = catalog.rename(columns={"Planet-period" : "periods", "Planet-radius": "prads"})
@@ -113,7 +113,14 @@ def make_mcmc_setup(N, D, nwalkers=24):
 
     def ll(a):
         a_period, a_radius = a[:4], a[4:]
-        comp_p, comp_r = comp_poly(bins_p[:-1], *a_period), comp_poly(bins_r[:-1], *a_radius)
+        comp_p, comp_r = comp_poly(np.log10(bins_p[:-1]), *a_period), comp_poly(np.log10(bins_r[:-1]), *a_radius)
+        for comp_ind in (comp_p, comp_r):
+            if np.any(comp_ind < 0):
+                comp_ind -= np.min(comp_ind)
+            if np.any(comp_p == 0):
+                comp_ind += eps
+        '''if np.any(np.diff(comp_p) > 0) or np.any(np.diff(comp_r) < 0):
+            return -300'''
         comp = np.outer(comp_p, comp_r)
         mu = N * comp
         if np.any(mu <= 0):
@@ -130,14 +137,15 @@ def make_mcmc_setup(N, D, nwalkers=24):
     def prior(a):
         if not np.all(np.isfinite(a)):
             return -np.inf
-        return stats.multivariate_normal.logpdf(a, mean=leastsq_sol, cov=np.diag(np.ones((8,))))
+        return 1
+        # return stats.multivariate_normal.logpdf(a, mean=leastsq_sol, cov=np.diag(np.ones((8,))))
             # and np.all(np.abs(leastsq_sol - a) < np.maximum(10, np.abs(8 * leastsq_sol)))
 
     def ll_with_prior(a):
         return ll(a) + prior(a)
     
     flag = False
-    p0 = leastsq_sol + np.random.normal(0, 1e-3, size=(nwalkers, ndim))
+    p0 = leastsq_sol + np.random.normal(0, 1e-6, size=(nwalkers, ndim))
     while not flag:
         lls = np.array([ll_with_prior(p) for p in p0])
         if -np.inf not in lls:

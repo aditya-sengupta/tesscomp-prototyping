@@ -5,6 +5,7 @@
 import numpy as np
 import pandas as pd
 import scipy.stats as stats
+import warnings
 
 ln10 = np.log(10)
 G_conv = 27420 # the Sun's surface g
@@ -14,15 +15,40 @@ start_catalog = pd.read_csv('csv-file-toi-catalog.csv', comment='#')
 
 # get intrinsic stellar parameters
 
-toiids = start_catalog["Full TOI ID"]
-logg = start_catalog["Surface Gravity Value"]
-d_logg = start_catalog["Surface Gravity Uncertainty"]
-R_star = start_catalog["Star Radius Value"]
-dR_star = start_catalog["Star Radius Error"]
+tic = start_catalog["TIC"].values
+warnings.warn("Currently double-counting stellar targets with multiplicity > 1: please fix")
+
+logg = start_catalog["Surface Gravity Value"].values
+d_logg = start_catalog["Surface Gravity Uncertainty"].values
+R_star = start_catalog["Star Radius Value"].values
+dR_star = start_catalog["Star Radius Error"].values
+teff_star = start_catalog["Effective Temperature Value"].values
+dteff_star = start_catalog["Effective Temperature Uncertainty"].values
 M_star = 10 ** logg * R_star ** 2 / G_conv
 dM_star = np.sqrt((M_star * ln10 * d_logg) ** 2 + (2 * M_star * dR_star / R_star) ** 2)
 dens = rho_conv * M_star / R_star ** 3
 d_dens = dens * (dM_star / M_star + 3 * dR_star / R_star)
+snr = start_catalog["Signal-to-noise"].values
+
+tess_stellar_dict = {
+    "tic" : tic,
+    "mass" : M_star,
+    "mass_err1" : dM_star,
+    "mass_err2" : -dM_star,
+    "logg" : logg,
+    "logg_err1" : d_logg,
+    "logg_err2" : -d_logg,
+    "radius" : R_star,
+    "radius_err1" : dR_star,
+    "radius_err2" : -dR_star,
+    "dens" : dens,
+    "dens_err1" : d_dens,
+    "dens_err2" : -d_dens,
+    "teff" : teff_star,
+    "teff_err1" : dteff_star,
+    "teff_err2" : -dteff_star,
+    "snr" : snr
+}
 
 # get CDPPs
 
@@ -37,7 +63,7 @@ rows_to_remove = [np.where(np.logical_and(cdpp_inds[:,0] == idx, cdpp_inds[:,1] 
 cdpp_matrix = np.delete(cdpp_matrix, rows_to_remove, axis=0)
 cdpp_inds = np.delete(cdpp_inds, rows_to_remove, axis=0)
 first_lookups = np.searchsorted(cdpp_inds[:,0], np.arange(num_tois))
-new_cdpp_matrix = np.empty((num_tois, cdpp_matrix.shape[1]))
+new_cdpp_matrix = np.empty((num_tois, cdpp_vals.shape[1]))
 no_cdpp_inds = []
 
 for i, f in enumerate(first_lookups):
@@ -49,10 +75,16 @@ for i, f in enumerate(first_lookups):
         assert i in problem_idxs
         no_cdpp_inds.append(i)
         new_cdpp_matrix[i] = np.zeros(14,)
-    new_cdpp_matrix[i] = cdpp_slice[np.argmin(cdpp_slice[:,2])]
+    else:
+        new_cdpp_matrix[i] = cdpp_slice[np.argmin(cdpp_slice[:,2])][2:]
 
 # TOIs at indices 644, 968, 980, 981, 1029, 1640, 1681 do not have any valid CDPP values
 # for whatever reason
+
+for k in tess_stellar_dict.keys():
+    tess_stellar_dict[k] = np.delete(tess_stellar_dict[k], no_cdpp_inds, axis=0)
+
+num_tois -= len(no_cdpp_inds)
 
 log_long_durations = np.log10(np.array([7.5, 9.0, 10.5, 12.0, 12.5, 15.0]))
 log_short_durations = np.log10(np.array([2.0, 2.5, 3.0, 3.5, 4.5]))
@@ -62,7 +94,7 @@ cdppslpshrt = np.array([stats.linregress(log_short_durations, np.log10(cdpp_vals
 # data span and duty cycle
 
 def get_sector_ints(idx):
-    return [int(x) for x in toi['Sectors'].values[idx].split()]
+    return [int(x) for x in start_catalog['Sectors'].values[idx].split()]
 
 dutycycle = 13.0 / 13.6 * np.ones(num_tois,) # Sullivan et al., section 6.5
 dataspan = 27 * np.array([len(get_sector_ints(i)) for i in range(num_tois)]) # days
@@ -77,21 +109,14 @@ limbdark_coeff4 = np.zeros(num_tois,)
 # put stuff in the stellar frame
 
 rrmskeys = ['rrmscdpp01p5', 'rrmscdpp02p0', 'rrmscdpp02p5', 'rrmscdpp03p0', 'rrmscdpp03p5', 'rrmscdpp04p5', 'rrmscdpp05p0', 'rrmscdpp06p0', 'rrmscdpp07p5', 'rrmscdpp09p0', 'rrmscdpp10p5', 'rrmscdpp12p0', 'rrmscdpp12p5', 'rrmscdpp15p0']
+mesthreskeys = ['mesthres01p5', 'mesthres02p0', 'mesthres02p5', 'mesthres03p0', 'mesthres03p5', 'mesthres04p5', 'mesthres05p0' 'mesthres06p0', 'mesthres07p5', 'mesthres09p0', 'mesthres10p5', 'mesthres12p0', 'mesthres12p5', 'mesthres15p0']
 
-rrmsdict = {rrmskeys[i] : new_cdpp_matrix[:,i] for i in range(len(rrmskeys))}
+rrmsdict = {rrmskeys[i] : np.delete(new_cdpp_matrix[:,i], no_cdpp_inds, axis=0) for i in range(len(rrmskeys))}
+mesthresdict = {k : 7.1 * np.ones(num_tois,) for k in mesthreskeys}
 
-tess_stellar = pd.DataFrame({
-    "id" : toiids,
-    "mass" : M_star,
-    "mass_err1" : dM_star,
-    "mass_err2" : -dM_star,
-    "radius" : R_star,
-    "radius_err1" : dR_star,
-    "radius_err2" : -dR_star,
-    "dens" : dens,
-    "dens_err1" : d_dens,
-    "dens_err2" : -d_dens,
-}.update(rrmsdict).update({
+tess_stellar_dict.update(rrmsdict)
+tess_stellar_dict.update(mesthresdict)
+tess_stellar_dict.update({
     "cdppslplong" : cdppslplong,
     "cdppslpshrt" : cdppslpshrt,
     "dataspan" : dataspan,
@@ -99,11 +124,36 @@ tess_stellar = pd.DataFrame({
     "limbdark_coeff1" : limbdark_coeff1,
     "limbdark_coeff2" : limbdark_coeff2,
     "limbdark_coeff3" : limbdark_coeff3,
-    "limbdark_coeff4" : limbdark_coeff4
-}))
+    "limbdark_coeff4" : limbdark_coeff4,
+})
 
+
+tess_stellar = pd.DataFrame(tess_stellar_dict)
 tess_stellar.to_csv('tess_stellar.csv')
 
 # and now, all the same stuff for planetary
+# I think all of this could be in Pandas operations, but eh
 
+toi_ids = start_catalog["Full TOI ID"].values
+toi_disp = start_catalog["TOI Disposition"].values
+toi_period = start_catalog["Orbital Period Value"].values
+# toi_duration = 
+# toi_depth = 
+toi_prad = start_catalog["Planet Radius Value"].values
+toi_prad_err1 = start_catalog["Planet Radius Error"].values
+toi_prad_err2 = -start_catalog["Planet Radius Error"].values
+toi_ror = toi_prad * 0.009158 / R_star
 
+toi_dict = {
+    "tessid" : toi_ids,
+    "tic" : tic,
+    "toi_disp" : toi_disp,
+    "toi_period" : toi_period,
+    "toi_prad" : toi_prad,
+    "toi_prad_err1" : toi_prad_err1,
+    "toi_prad_err2" : toi_prad_err2,
+    "toi_ror" : toi_ror
+}
+
+tois = pd.DataFrame(toi_dict)
+tois.to_csv("tois.csv")
