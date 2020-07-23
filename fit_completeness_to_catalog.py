@@ -20,8 +20,8 @@ N2 = 6.1
 sigma2 = 2
 fs = 0.55
 mixture_params = {"N1": N1, "sigma1": sigma1, "N2": N2, "sigma2": sigma2, "fs": fs}
-bins_p = 10 ** (np.linspace(*np.log10(rng_p), num_bins_p))
-bins_r = 10 ** (np.linspace(*np.log10(rng_r), num_bins_r))
+bins_p = np.exp(np.linspace(*np.log(rng_p), num_bins_p))
+bins_r = np.exp(np.linspace(*np.log(rng_r), num_bins_r))
 eps = 1e-3
 
 def make_synth_solar_systems(mixture_params=mixture_params, num_stars=10000, mstar=0.4):
@@ -109,11 +109,11 @@ def make_hists(synth, catalog, plot=True):
 comp_poly = lambda x, a1, a2, a3, a4: a4 + a1 * x + (a1 * a2) * x ** 2 + (a1/3) * (a2**2 + a3**2) * x ** 3
 
 def make_mcmc_setup(N, D, nwalkers=24):
-    log_fact_D = special.gammaln(D + 1) * np.log10(np.e)
+    log_fact_D = special.gammaln(D + 1)
 
     def ll(a):
         a_period, a_radius = a[:4], a[4:]
-        comp_p, comp_r = comp_poly(np.log10(bins_p[:-1]), *a_period), comp_poly(np.log10(bins_r[:-1]), *a_radius)
+        comp_p, comp_r = comp_poly(np.log(bins_p[:-1]), *a_period), comp_poly(np.log(bins_r[:-1]), *a_radius)
         for comp_ind in (comp_p, comp_r):
             if np.any(comp_ind < 0):
                 comp_ind -= np.min(comp_ind)
@@ -137,7 +137,7 @@ def make_mcmc_setup(N, D, nwalkers=24):
     def prior(a):
         if not np.all(np.isfinite(a)):
             return -np.inf
-        return 1
+        return 0
         # return stats.multivariate_normal.logpdf(a, mean=leastsq_sol, cov=np.diag(np.ones((8,))))
             # and np.all(np.abs(leastsq_sol - a) < np.maximum(10, np.abs(8 * leastsq_sol)))
 
