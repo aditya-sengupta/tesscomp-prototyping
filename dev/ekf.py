@@ -1,4 +1,5 @@
 import numpy as np
+import copy
 eps = 1e-6
 
 def jacobian(f, p):

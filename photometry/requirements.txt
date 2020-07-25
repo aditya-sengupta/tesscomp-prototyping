@@ -1,0 +1,21 @@
+pytest
+pytest-mpl
+numpy == 1.17.5
+scipy == 1.3.3
+matplotlib == 3.2.1
+astropy == 4.0.1
+PyYAML
+photutils == 0.7.2
+Bottleneck == 1.3.2
+h5py >= 2.9.0
+scikit-image == 0.16.2
+scikit-learn == 0.22.2
+statsmodels == 0.11.1
+opencv-python-headless == 4.2.0.34
+psycopg2-binary
+astroquery >= 0.4 # Needed for halophot
+autograd == 1.3 # Needed for halophot
+future == 0.16.0 # Needed for halophot
+halophot == 0.7.3.2
+jplephem >= 2.9
+spiceypy == 3.0.2
