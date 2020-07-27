@@ -130,3 +130,5 @@ dmypy.json
 
 *.h5
 *.npy
+*.csv
+*.mat
