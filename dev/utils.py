@@ -3,18 +3,13 @@ import requests
 import warnings
 import pandas as pd
 from functools import reduce
-from urllib.parse import urljoin
 from io import BytesIO
 import sys
 sys.path.append("..")
 
 NUM_TESS_SECTORS = 27
-TESS_DATAPATH = "data/tesstargets/"
-assert TESS_DATAPATH[-1] == os.path.sep
-
-def url_join(*args):
-    # https://codereview.stackexchange.com/questions/175421/joining-strings-to-form-a-url
-    return reduce(urljoin, args).rstrip(os.path.sep)
+TESS_DATAPATH = os.path.abspath(os.path.dirname(os.getcwd())) + "/data/tesstargets/" # or change
+assert TESS_DATAPATH[-1] == os.path.sep, "must end datapath with {}".format(os.path.sep)
 
 def get_tess_stars_from_sector(sector_num, datapath=TESS_DATAPATH, subpath=None, verbose=True):
     '''
@@ -50,7 +45,7 @@ def get_tess_stars_from_sector(sector_num, datapath=TESS_DATAPATH, subpath=None,
         datapath = os.getcwd()
     if subpath is None:
         subpath = "TESS_targets_S{}.csv".format(sector)
-    fullpath = url_join(datapath, subpath)
+    fullpath = os.path.join(datapath, subpath)
 
     # queries the target list
     url = 'https://tess.mit.edu/wp-content/uploads/all_targets_S{}_v1.csv'.format(sector)
@@ -133,8 +128,7 @@ def get_tess_stellar(sectors=None):
         sectors = list(range(1, NUM_TESS_SECTORS + 1))
     frames = []
     for s in sectors:
-        datapath = urljoin(TESS_DATAPATH, "TESS_targets_S{}.csv".format(str(s).zfill(3)))
-        print(datapath)
+        datapath = os.path.join(TESS_DATAPATH, "TESS_targets_S{}.csv".format(str(s).zfill(3)))
         if os.path.exists(datapath):
             frames.append(pd.read_csv(datapath, comment='#'))
         else:
@@ -145,16 +139,16 @@ def get_tois(subpath="toi_catalog.csv"):
     '''
     Request a pandas dataframe of all the TESS objects of interest.
     '''
-    print(TESS_DATAPATH, subpath, url_join(TESS_DATAPATH, subpath))
-    fullpath = url_join(TESS_DATAPATH, subpath)
+    fullpath = os.path.join(TESS_DATAPATH, subpath)
     if os.path.exists(fullpath):
         return pd.read_csv(fullpath, comment='#')
     else:
-        url = "https://tev.mit.edu/data/collection/193/csv/5/"
+        url = "https://tev.mit.edu/data/collection/193/csv/6/"
         req = requests.get(url)
         tois = pd.read_csv(BytesIO(req.content), comment='#')
-        print(fullpath)
         tois.to_csv(fullpath)
+        return tois
+    
 
 if __name__ == "__main__":
     pass
