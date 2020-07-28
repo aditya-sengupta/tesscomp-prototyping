@@ -64,6 +64,7 @@ def get_tess_stars_from_sector(sector_num, datapath=TESS_DATAPATH, subpath=None,
         warnings.simplefilter("ignore")
         tic_data = Catalogs.query_criteria(catalog='Tic', ID=observed_ticids).to_pandas()
     # tic_data = tic_data.fillna(-1).astype({'ID': int, 'HIP' : int, 'KIC' : int, 'numcont' : int})
+    tic_data = tic_data.astype({"ID" : int})
     merged_data = tic_data.merge(observations, left_on='ID', right_on='TICID')
     merged_data.to_csv(fullpath)
     if verbose:
