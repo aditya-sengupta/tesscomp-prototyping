@@ -136,17 +136,65 @@ def get_tess_stellar(sectors=None):
             frames.append(get_tess_stars_from_sector(s))
     return pd.concat(frames)
 
-def get_tois(subpath="toi_catalog.csv"):
+def save_full_tess_stellar(subpath='tess_stellar_all.csv'):
+    '''
+    Call get_tess_stellar to save a full TESS catalog.
+    '''
+
+
+def get_tois(subpath="toi_catalog.csv", force_redownload=False):
     '''
     Request a pandas dataframe of all the TESS objects of interest.
     '''
     fullpath = os.path.join(TESS_DATAPATH, subpath)
-    if os.path.exists(fullpath):
-        return pd.read_csv(fullpath, comment='#')
+    if (not force_redownload) and os.path.exists(fullpath):
+        return pd.read_csv(fullpath, comment='#', index_col=0)
     else:
         url = "https://tev.mit.edu/data/collection/193/csv/6/"
+        print("Retrieving TOI table from {}.".format(url))
         req = requests.get(url)
-        tois = pd.read_csv(BytesIO(req.content), comment='#')
+        tois = pd.read_csv(BytesIO(req.content), comment='#', index_col=0)
+        tois = tois.rename(columns={
+            "Source Pipeline" : "pipeline",
+            "Full TOI ID" : "toi_id",
+            "TOI Disposition" : "toi_pdisposition",
+            "TIC Right Ascension" : "tic_ra",
+            "TIC Declination" : "tic_dec",
+            "TMag Value" : "tmag", 
+            "TMag Uncertainty" : "tmag_err", 
+            "Orbital Epoch Value" : "epoch",
+            "Orbital Epoch Error" : "epoch_err",
+            "Orbital Period Value" : "period",
+            "Orbital Period Error" : "period_err",
+            "Transit Duration Value" : "transit_dur",
+            "Transit Duration Error" : "transit_dur_err",
+            "Transit Depth Value" : "transit_depth",
+            "Transit Depth Error" : "transit_depth_err",
+            "Sectors" : "sectors",
+            "Public Comment" : "comment",
+            "Surface Gravity Value" : "surface_grav",
+            "Surface Gravity Uncertainty" : "surface_grav_err",
+            "Signal ID" : "signal_id",
+            "Star Radius Value" : "srad",
+            "Star Radius Error" : "srad_err",
+            "Planet Radius Value" : "prad",
+            "Planet Radius Error" : "prad_err",
+            "Planet Equilibrium Temperature (K) Value" : "ptemp",
+            "Effective Temperature Value" : "steff",
+            "Effective Temperature Uncertainty" : "steff_err",
+            "Effective Stellar Flux Value" : "sflux",
+            "Signal-to-noise" : "snr",
+            "Centroid Offset" : "centroid_offset",
+            "TFOP Master" : "tfop_master", 
+            "TFOP SG1a" : "tfop_sg1a", 
+            "TFOP SG1b" : "tfop_sg1b", 
+            "TFOP SG2" : "tfop_sg2", 
+            "TFOP SG3" : "tfop_sg3",
+            "TFOP SG4" : "tfop_sg4", 
+            "TFOP SG5" : "tfop_sg5", 
+            "Alerted" : "alerted", 
+            "Updated" : "updated"
+        })
         tois.to_csv(fullpath)
         return tois
     
