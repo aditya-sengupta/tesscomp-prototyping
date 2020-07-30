@@ -7,7 +7,7 @@ except ImportError:
 
 eps = 1e-6
 
-def jacobian(f, p):
+def jacobian(f, p, **kwargs):
     '''
     Finds the Jacobian matrix of the function f at the point p.
 
@@ -26,12 +26,12 @@ def jacobian(f, p):
     The Jacobian matrix (the matrix of first-order partial derivatives).
     '''
     n = len(p)
-    center = f(p)
-    rights = f(p + eps * np.eye(n))
-    lefts = f(p - eps * np.eye(n))
+    center = f(p, **kwargs)
+    rights = f(p + eps * np.eye(n), **kwargs)
+    lefts = f(p - eps * np.eye(n), **kwargs)
     return .5 * ((rights.T - center) / eps + (center - lefts.T) / eps).T
 
-class KFilter():
+class KFilter:
     '''
     Interface to a Kalman Filter or Extended Kalman Filter.
 
@@ -115,32 +115,37 @@ class KFilter():
         assert isinstance(self.Q, np.ndarray) and self.Q.shape == (self.s, self.s), "model covariance is invalid"
         assert isinstance(self.R, np.ndarray) and self.R.shape == (self.m, self.m), "measurement covariance is invalid"
 
-    def predict(self):
+    def measure(self):
+        if callable(self.h):
+            return self.h(self.state)
+        else:
+            return self.h @ self.state
+
+    def predict(self, **kwargs):
         self.prev_P = copy.deepcopy(self.P)
         if isinstance(self.f, np.ndarray):
             self.state = self.f @ self.state
             self.P = self.f @ self.P @ self.f + self.Q
         else:
-            A = jacobian(self.f, copy.deepcopy(self.state))
+            A = jacobian(self.f, copy.deepcopy(self.state), **kwargs)
             self.state = self.f(self.state)
             self.P = A @ self.P @ A + self.Q
 
     def update(self, measurement):
         if isinstance(self.h, np.ndarray):
             C = self.h
-            innovation = measurement - self.h @ self.state
         else:
             C = jacobian(self.h, copy.deepcopy(self.state))
-            innovation = measurement - self.h(self.state)
+        innovation = measurement - self.measure()
         if not self.steady_state:
             self.K = self.P @ C.T @ np.linalg.inv(C @ self.P @ C.T + self.R)
             self.P -= self.K @ (C @ self.P)
             if np.allclose(self.P, self.prev_P):
                 self.steady_state = True
-        innovation = measurement - C @ self.state
+        innovation = measurement - self.measure()
         self.state = self.state + self.K @ innovation
 
-    def run_kf(self, signal, progress=True):
+    def run_kf(self, signal, progress=True, **kwargs):
         predict_chain = np.zeros(len(signal), self.s)
         filter_chain = np.zeros(len(signal), self.s)
         if progress and 'tqdm' in globals():
@@ -149,12 +154,12 @@ class KFilter():
             track_progress = lambda x: x
         try:
             for i, m in enumerate(track_progress(signal)):
-                self.predict()
+                self.predict(**kwargs)
                 predict_chain[i] = self.state
-                self.update(m)
+                self.update(m, **kwargs)
                 filter_chain[i] = self.state
         except KeyboardInterrupt:
-            continue
+            print("Filter terminated early, saving results.")
         for objchain, chain in zip([self.predict_chain, self.filter_chain], [predict_chain, filter_chain]):
             objchain = np.hstack((objchain, chain))
 
@@ -164,4 +169,4 @@ class KFilter():
         self.steady_state = False
         self.prev_P = np.zeros_like(self.P)
         self.P = np.zeros_like(self.P)
-        self.state = np.zeros_like(self.state),
+        self.state = np.zeros_like(self.state)
