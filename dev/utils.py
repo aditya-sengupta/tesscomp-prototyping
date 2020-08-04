@@ -1,6 +1,7 @@
 import os
 import requests
 import warnings
+import numpy as np
 import pandas as pd
 from functools import reduce
 from io import BytesIO
@@ -15,8 +16,6 @@ def get_tess_stars_from_sector(sector_num, datapath=TESS_DATAPATH, subpath=None,
     '''
     Queries https://tess.mit.edu/observations/target-lists/ for the input catalog from TESS sector 'sector_num',
     and for each target in that list, gets its data from astroquery and joins the two catalogs.
-
-    NOTE: to avoid automatic conversion of int columns with NaNs to float, NaNs are default-replaced with -1.
 
     Arguments
     ---------
@@ -110,7 +109,7 @@ def check_num_tess_sectors():
     if i - 1 != NUM_TESS_SECTORS:
         print("NUM_TESS_SECTORS is listed as {0}, but data was found for {1} sectors: update the variable NUM_TESS_SECTORS for the full data.".format(NUM_TESS_SECTORS, i))
 
-def get_tess_stellar(sectors=None):
+def get_tess_stellar(sectors=None, unique=True):
     '''
     Wrapper around tess_target_stars.py to merge all sectors.
 
@@ -119,28 +118,49 @@ def get_tess_stellar(sectors=None):
     sectors : list
     A list of sector IDs to query.
 
+    unique : bool
+    If true, this function cuts down the stellar dataframe to only unique entries, and adds a few columns.
+
     Returns
     -------
     stlr : pd.DataFrame
-    The stellar dataframe. Note that this does not drop duplicates: each unique observation of a star counts as a separate row.
-    To get only the unique stars, use df.drop_duplicates after calling this function.
+    The stellar dataframe. If `unique`, the returned value is instead
+
+    stlr : pd.DataFrame
+    The stellar dataframe, with duplicates dropped and the following columns added:
+        sectors, str      : the sectors in which the target was observed.
+        dataspan, scalar  : 27.4 days times the number of sectors in which the target was observed.
+        dutycycle, scalar : the fraction 13.0/13.6 (for the 0.6 day downlink)
+        snr, scalar       : literally just 7.1 repeated for every entry because I don't know how to fill this in
     '''
     if sectors is None:
         sectors = list(range(1, NUM_TESS_SECTORS + 1))
     frames = []
+    sector_obs = {}
+    sector_cnt = {}
     for s in sectors:
         datapath = os.path.join(TESS_DATAPATH, "TESS_targets_S{}.csv".format(str(s).zfill(3)))
         if os.path.exists(datapath):
-            frames.append(pd.read_csv(datapath, comment='#'))
+            df = pd.read_csv(datapath, comment='#', index_col=0)
         else:
-            frames.append(get_tess_stars_from_sector(s))
-    return pd.concat(frames)
-
-def save_full_tess_stellar(subpath='tess_stellar_all.csv'):
-    '''
-    Call get_tess_stellar to save a full TESS catalog.
-    '''
-
+            df = get_tess_stars_from_sector(s)
+        if unique:
+            for ticid in df["ID"].values:
+                if ticid not in sector_obs:
+                    sector_obs[ticid] = str(s)
+                    sector_cnt[ticid] = 1
+                else:
+                    sector_obs[ticid] += ',' + str(s)
+                    sector_cnt[ticid] += 1
+        frames.append(df)
+    stlr = pd.concat(frames)
+    if unique:
+        stlr.drop_duplicates(subset="ID", inplace=True)
+        stlr["sectors"] = [sector_obs.get(ticid) for ticid in stlr["ID"].values]
+        stlr["dataspan"] = 27.4 * np.array([sector_cnt.get(ticid) for ticid in stlr["ID"].values])
+        stlr["dutycycle"] = 13.0/13.6 * np.ones_like(stlr["dataspan"])
+        stlr["snr"] = 7.1 * np.ones_like(stlr["dataspan"])
+    return stlr
 
 def get_tois(subpath="toi_catalog.csv", force_redownload=False):
     '''
@@ -162,7 +182,7 @@ def get_tois(subpath="toi_catalog.csv", force_redownload=False):
             "TIC Declination" : "tic_dec",
             "TMag Value" : "tmag", 
             "TMag Uncertainty" : "tmag_err", 
-            "Orbital Epoch Value" : "epoch",
+            "Orbital Epoch Value" : "eepoch",
             "Orbital Epoch Error" : "epoch_err",
             "Orbital Period Value" : "toi_period",
             "Orbital Period Error" : "toi_period_err",
@@ -198,7 +218,6 @@ def get_tois(subpath="toi_catalog.csv", force_redownload=False):
         tois.to_csv(fullpath)
         return tois
     
-
 if __name__ == "__main__":
     pass
     # print(get_num_tess_stars())
