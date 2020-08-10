@@ -158,7 +158,7 @@ def get_tess_stellar(sectors=None, unique=True):
         stlr.drop_duplicates(subset="ID", inplace=True)
         stlr["sectors"] = [sector_obs.get(ticid) for ticid in stlr["ID"].values]
         stlr["dataspan"] = 27.4 * np.array([sector_cnt.get(ticid) for ticid in stlr["ID"].values])
-        stlr["dutycycle"] = 13.0/13.6 * np.ones_like(stlr["dataspan"])
+        stlr["dutycycle"] = 13.0/13.7 * np.ones_like(stlr["dataspan"])
         stlr["snr"] = 7.1 * np.ones_like(stlr["dataspan"])
     return stlr
 
@@ -182,7 +182,7 @@ def get_tois(subpath="toi_catalog.csv", force_redownload=False):
             "TIC Declination" : "tic_dec",
             "TMag Value" : "tmag", 
             "TMag Uncertainty" : "tmag_err", 
-            "Orbital Epoch Value" : "eepoch",
+            "Orbital Epoch Value" : "epoch",
             "Orbital Epoch Error" : "epoch_err",
             "Orbital Period Value" : "toi_period",
             "Orbital Period Error" : "toi_period_err",
