@@ -27,18 +27,21 @@ def observable(star, sector):
 
     Returns
     -------
-    ccd : int
-    The CCD (1-4) number on which the star should've been observed; 0 if it wasn't observable.
+    camera : int
+    The camera (1-4) number on which the star should've been observed; 0 if it wasn't observable.
     Can do bool() on the output to just get a true/false of observability.
     '''
     ra, dec = star.ra, star.dec
     centers = sector_centers[sector]
-    for ccd in range(4):
-        center_ra = float(centers[pointing_columns[2*ccd]])
-        center_dec = float(centers[pointing_columns[2*ccd+1]])
+    for camera in range(1, 5):
+        center_ra = float(centers[pointing_columns[2*(camera - 1)]])
+        center_dec = float(centers[pointing_columns[2*camera-1]])
         if abs(center_ra - ra) < half_detector_size and abs(center_dec - dec) < half_detector_size:
-            return ccd + 1
+            return camera + 1
     return 0
+
+def position(star, sector, camera):
+    pass
 
 if __name__ == "__main__":
     class star:
