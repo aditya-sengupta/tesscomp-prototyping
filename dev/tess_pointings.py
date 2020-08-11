@@ -36,18 +36,18 @@ def observable(star, sector):
     for camera in range(1, 5):
         center_ra = float(centers[pointing_columns[2*(camera - 1)]])
         center_dec = float(centers[pointing_columns[2*camera-1]])
-        if abs(center_ra - ra) < half_detector_size and abs(center_dec - dec) < half_detector_size:
-            return camera + 1
+        if abs(center_ra - ra) / np.cos(center_dec) < half_detector_size and abs(center_dec - dec) < half_detector_size:
+            return camera
     return 0
 
 def position(star, sector, camera):
     pass
 
 if __name__ == "__main__":
-    class star:
-        def __init__(self, ra, dec):
-            self.ra = ra
-            self.dec = dec
-
-    star_8195886 = star(311.3326, -38.4275)
-    print(observable(star_8195886, 1)) # should be 1
+    for i, star in pd.read_csv("../data/tesstargets/tess_stellar_all.csv").iterrows():
+        for sector in star["sectors"].split(','):
+            obs = observable(star, int(sector))
+            try:
+                assert obs == star['Camera']
+            except AssertionError:
+                print("for star idx {0}, obs says {1} but data says {2}".format(i, obs, star['Camera']))
