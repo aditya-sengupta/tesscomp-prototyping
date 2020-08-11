@@ -36,7 +36,7 @@ def observable(star, sector):
     for camera in range(1, 5):
         center_ra = float(centers[pointing_columns[2*(camera - 1)]])
         center_dec = float(centers[pointing_columns[2*camera-1]])
-        if abs(center_ra - ra) / np.cos(center_dec) < half_detector_size and abs(center_dec - dec) < half_detector_size:
+        if abs(center_ra - ra) * np.cos(center_dec * np.pi / 180) < half_detector_size and abs(center_dec - dec) < half_detector_size:
             return camera
     return 0
 
