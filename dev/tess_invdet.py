@@ -17,6 +17,7 @@ for entry in invdets:
         occurrence.append(float(entry[:entry.index('+')]))
         occ_err_pl.append(float(entry[entry.index('+') + 1:entry.index('-')]))
         occ_err_mn.append(float(entry[entry.index('-') + 1:-1]))
+# comment for dummy change
 
 occurrence = np.array(occurrence).reshape((len(period_bins)-1, len(radius_bins)-1))
 plt.imshow(occurrence, origin='lower')
