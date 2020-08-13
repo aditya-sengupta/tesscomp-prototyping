@@ -27,10 +27,10 @@ def get_tess_photometric_noise(sector_num, datapath=utils.TESS_DATAPATH, subpath
     ids_to_skip = set()
     if os.path.exists(fullpath):
         saved_noise_dataframe = pd.read_csv(fullpath)
-        if len(saved_noise_dataframe) == len(stlr):
+        if sum(saved_noise_dataframe.noise != 0) == len(stlr):
             return saved_noise_dataframe
         else:
-            ids_to_skip = set(saved_noise_dataframe.ID.values)
+            ids_to_skip = set(saved_noise_dataframe[saved_noise_dataframe.noise != 0].ID.values)
     
     noises = np.zeros(len(stlr))
     try:
@@ -44,9 +44,9 @@ def get_tess_photometric_noise(sector_num, datapath=utils.TESS_DATAPATH, subpath
                 response = request.urlopen(query_url)
                 text = str(response.read())
                 noises[i] = float(text[text.find("sigma = ") + 7:text.find("ppm")])
-    except error.URLError:
+    except (error.URLError, ConnectionError, KeyboardInterrupt):
         pass
-    noise_dataframe = pd.DataFrame({"ID" : stlr.ID, "noise" : stlr.noises})
+    noise_dataframe = pd.DataFrame({"ID" : stlr.ID, "noise" : noises})
     noise_dataframe.to_csv(fullpath)
     return noise_dataframe
     
