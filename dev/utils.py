@@ -12,7 +12,7 @@ NUM_TESS_SECTORS = 27
 TESS_DATAPATH = os.path.abspath(os.path.dirname(os.getcwd())) + "/data/tesstargets/" # or change
 assert TESS_DATAPATH[-1] == os.path.sep, "must end datapath with {}".format(os.path.sep)
 
-def get_tess_stars_from_sector(sector_num, datapath=TESS_DATAPATH, subpath=None, verbose=True):
+def get_tess_stars_from_sector(sector_num, datapath=TESS_DATAPATH, subpath=None, force_redownload=False, verbose=True):
     '''
     Queries https://tess.mit.edu/observations/target-lists/ for the input catalog from TESS sector 'sector_num',
     and for each target in that list, gets its data from astroquery and joins the two catalogs.
@@ -46,29 +46,32 @@ def get_tess_stars_from_sector(sector_num, datapath=TESS_DATAPATH, subpath=None,
         subpath = "TESS_targets_S{}.csv".format(sector)
     fullpath = os.path.join(datapath, subpath)
 
-    # queries the target list
-    url = 'https://tess.mit.edu/wp-content/uploads/all_targets_S{}_v1.csv'.format(sector)
-    if verbose:
-        print("Getting sector {0} observed targets from {1}.".format(sector_num, url))
-    req = requests.get(url)
-    if not req.ok:
-        raise requests.exceptions.HTTPError("Data from sector {} is not available.".format(sector_num))
-    observations = pd.read_csv(BytesIO(req.content), comment='#')[['TICID', 'Camera', 'CCD']] # MAST has Tmag, RA, Dec at higher precision
-    observed_ticids = observations['TICID'].values
+    if (not os.path.exists(fullpath)) or force_redownload:
+        # queries the target list
+        url = 'https://tess.mit.edu/wp-content/uploads/all_targets_S{}_v1.csv'.format(sector)
+        if verbose:
+            print("Getting sector {0} observed targets from {1}.".format(sector_num, url))
+        req = requests.get(url)
+        if not req.ok:
+            raise requests.exceptions.HTTPError("Data from sector {} is not available.".format(sector_num))
+        observations = pd.read_csv(BytesIO(req.content), comment='#')[['TICID', 'Camera', 'CCD']] # MAST has Tmag, RA, Dec at higher precision
+        observed_ticids = observations['TICID'].values
 
-    # queries MAST for stellar data
-    if verbose:
-        print("Querying MAST for sector {0} observed targets.".format(sector_num))
-    with warnings.catch_warnings():
-        warnings.simplefilter("ignore")
-        tic_data = Catalogs.query_criteria(catalog='Tic', ID=observed_ticids).to_pandas()
-    # tic_data = tic_data.fillna(-1).astype({'ID': int, 'HIP' : int, 'KIC' : int, 'numcont' : int})
-    tic_data = tic_data.astype({"ID" : int})
-    merged_data = tic_data.merge(observations, left_on='ID', right_on='TICID')
-    merged_data.to_csv(fullpath)
-    if verbose:
-        print("Saved TIC data from TESS sector {0} to path {1}.".format(sector_num, fullpath))
-    return merged_data
+        # queries MAST for stellar data
+        if verbose:
+            print("Querying MAST for sector {0} observed targets.".format(sector_num))
+        with warnings.catch_warnings():
+            warnings.simplefilter("ignore")
+            tic_data = Catalogs.query_criteria(catalog='Tic', ID=observed_ticids).to_pandas()
+        # tic_data = tic_data.fillna(-1).astype({'ID': int, 'HIP' : int, 'KIC' : int, 'numcont' : int})
+        tic_data = tic_data.astype({"ID" : int})
+        merged_data = tic_data.merge(observations, left_on='ID', right_on='TICID')
+        merged_data.to_csv(fullpath)
+        if verbose:
+            print("Saved TIC data from TESS sector {0} to path {1}.".format(sector_num, fullpath))
+        return merged_data
+    else:
+        return pd.read_csv(fullpath, index_col=0)
 
 def get_stellar_data(sectors=True):
     '''
