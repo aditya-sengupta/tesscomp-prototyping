@@ -66,6 +66,11 @@ def get_tess_stars_from_sector(sector_num, datapath=TESS_DATAPATH, subpath=None,
         # tic_data = tic_data.fillna(-1).astype({'ID': int, 'HIP' : int, 'KIC' : int, 'numcont' : int})
         tic_data = tic_data.astype({"ID" : int})
         merged_data = tic_data.merge(observations, left_on='ID', right_on='TICID')
+        noises_path = os.path.join(datapath, "TESS_noise_S{}.csv".format(sector))
+        if os.path.exists(noises_path):
+            merged_data = merged_data.merge(pd.read_csv(noises_path, index_col=0, comment='#'), on="ID")
+        else:
+            print("Noise values not found on path: change file location or download using get_tess_photometric_noise.py.")
         merged_data.to_csv(fullpath)
         if verbose:
             print("Saved TIC data from TESS sector {0} to path {1}.".format(sector_num, fullpath))
@@ -112,7 +117,7 @@ def check_num_tess_sectors():
     if i - 1 != NUM_TESS_SECTORS:
         print("NUM_TESS_SECTORS is listed as {0}, but data was found for {1} sectors: update the variable NUM_TESS_SECTORS for the full data.".format(NUM_TESS_SECTORS, i))
 
-def get_tess_stellar(sectors=None, unique=True):
+def get_tess_stellar(sectors=None, unique=True, force_resave=False, force_redownload=False):
     '''
     Wrapper around tess_target_stars.py to merge all sectors.
 
@@ -124,45 +129,51 @@ def get_tess_stellar(sectors=None, unique=True):
     unique : bool
     If true, this function cuts down the stellar dataframe to only unique entries, and adds a few columns.
 
+    force_resave : bool
+    If true, forces a reread of the constituent files from the URL (rerun of get_tses_stars_from_sector)
+
     Returns
     -------
     stlr : pd.DataFrame
-    The stellar dataframe. If `unique`, the returned value is instead
+    The stellar dataframe. If `unique`, the returned value is instead:
 
     stlr : pd.DataFrame
     The stellar dataframe, with duplicates dropped and the following columns added:
         sectors, str      : the sectors in which the target was observed.
         dataspan, scalar  : 27.4 days times the number of sectors in which the target was observed.
         dutycycle, scalar : the fraction 13.0/13.6 (for the 0.6 day downlink)
-        snr, scalar       : literally just 7.1 repeated for every entry because I don't know how to fill this in
+        noise, scalar     : the 1-hour photometric noise (replacement for CDPP but not averaged over timescales)
     '''
     if sectors is None:
         sectors = list(range(1, NUM_TESS_SECTORS + 1))
     frames = []
     sector_obs = {}
     sector_cnt = {}
+    noises = {}
     for s in sectors:
         datapath = os.path.join(TESS_DATAPATH, "TESS_targets_S{}.csv".format(str(s).zfill(3)))
-        if os.path.exists(datapath):
+        if os.path.exists(datapath) and (not force_resave):
             df = pd.read_csv(datapath, comment='#', index_col=0)
         else:
-            df = get_tess_stars_from_sector(s)
+            df = get_tess_stars_from_sector(s, force_redownload=force_redownload)
         if unique:
-            for ticid in df["ID"].values:
+            for ticid, noise in zip(df["ID"].values, df["noise"].values):
                 if ticid not in sector_obs:
                     sector_obs[ticid] = str(s)
                     sector_cnt[ticid] = 1
+                    noises[ticid] = str(noise)
                 else:
                     sector_obs[ticid] += ',' + str(s)
                     sector_cnt[ticid] += 1
+                    noises[ticid] += ',' + str(noise)
         frames.append(df)
     stlr = pd.concat(frames)
     if unique:
         stlr.drop_duplicates(subset="ID", inplace=True)
         stlr["sectors"] = [sector_obs.get(ticid) for ticid in stlr["ID"].values]
+        stlr["noise"] = [noises.get(ticid) for ticid in stlr["ID"].values]
         stlr["dataspan"] = 27.4 * np.array([sector_cnt.get(ticid) for ticid in stlr["ID"].values])
         stlr["dutycycle"] = 13.0/13.7 * np.ones_like(stlr["dataspan"])
-        stlr["snr"] = 7.1 * np.ones_like(stlr["dataspan"])
     return stlr
 
 def get_tois(subpath="toi_catalog.csv", force_redownload=False):
@@ -222,5 +233,7 @@ def get_tois(subpath="toi_catalog.csv", force_redownload=False):
         return tois
     
 if __name__ == "__main__":
-    pass
+    stlr_all = get_tess_stellar(force_resave=True)
+    stlr_all.to_csv("../data/tesstargets/tess_stellar_all.csv")
+
     # print(get_num_tess_stars())
