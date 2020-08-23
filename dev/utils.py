@@ -71,6 +71,7 @@ def get_tess_stars_from_sector(sector_num, datapath=TESS_DATAPATH, subpath=None,
             merged_data = merged_data.merge(pd.read_csv(noises_path, index_col=0, comment='#'), on="ID")
         else:
             print("Noise values not found on path: change file location or download using get_tess_photometric_noise.py.")
+        merged_data = merged_data.rename({"ID" : "ticid"})
         merged_data.to_csv(fullpath)
         if verbose:
             print("Saved TIC data from TESS sector {0} to path {1}.".format(sector_num, fullpath))
@@ -157,7 +158,7 @@ def get_tess_stellar(sectors=None, unique=True, force_resave=False, force_redown
         else:
             df = get_tess_stars_from_sector(s, force_redownload=force_redownload)
         if unique:
-            for ticid, noise in zip(df["ID"].values, df["noise"].values):
+            for ticid, noise in zip(df["ticid"].values, df["noise"].values):
                 if ticid not in sector_obs:
                     sector_obs[ticid] = str(s)
                     sector_cnt[ticid] = 1
@@ -169,10 +170,10 @@ def get_tess_stellar(sectors=None, unique=True, force_resave=False, force_redown
         frames.append(df)
     stlr = pd.concat(frames)
     if unique:
-        stlr.drop_duplicates(subset="ID", inplace=True)
-        stlr["sectors"] = [sector_obs.get(ticid) for ticid in stlr["ID"].values]
-        stlr["noise"] = [noises.get(ticid) for ticid in stlr["ID"].values]
-        stlr["dataspan"] = 27.4 * np.array([sector_cnt.get(ticid) for ticid in stlr["ID"].values])
+        stlr.drop_duplicates(subset="ticid", inplace=True)
+        stlr["sectors"] = [sector_obs.get(ticid) for ticid in stlr["ticid"].values]
+        stlr["noise"] = [noises.get(ticid) for ticid in stlr["ticid"].values]
+        stlr["dataspan"] = 27.4 * np.array([sector_cnt.get(ticid) for ticid in stlr["ticid"].values])
         stlr["dutycycle"] = 13.0/13.7 * np.ones_like(stlr["dataspan"])
     return stlr
 
@@ -182,7 +183,7 @@ def get_tois(subpath="toi_catalog.csv", force_redownload=False):
     '''
     fullpath = os.path.join(TESS_DATAPATH, subpath)
     if (not force_redownload) and os.path.exists(fullpath):
-        return pd.read_csv(fullpath, comment='#', index_col=0)
+        return pd.read_csv(fullpath, comment='#')
     else:
         url = "https://tev.mit.edu/data/collection/193/csv/6/"
         print("Retrieving TOI table from {}.".format(url))
